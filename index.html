@@ -244,40 +244,60 @@
     /* Card Quick Actions Menu */
     .card-actions-bar {
       position: absolute;
-      bottom: -36px;
+      bottom: 10px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(18, 21, 27, 0.9);
-      border: 1px solid var(--panel-border);
-      border-radius: 20px;
+      background: rgba(15, 18, 25, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-radius: 24px;
       display: flex;
       align-items: center;
-      gap: 4px;
-      padding: 3px 6px;
+      gap: 5px;
+      padding: 4px 8px;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.2s ease, bottom 0.2s ease;
-      z-index: 10;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 25;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.7);
+    }
+
+    /* Invisible hover bridge around the bar so mouse never loses focus */
+    .card-actions-bar::before {
+      content: '';
+      position: absolute;
+      top: -15px;
+      bottom: -15px;
+      left: -15px;
+      right: -15px;
+      z-index: -1;
     }
 
     .board-card:hover .card-actions-bar,
     .board-card.selected .card-actions-bar {
       opacity: 1;
       pointer-events: auto;
-      bottom: -40px;
+      transform: translateX(-50%) translateY(0);
     }
 
     .card-action-btn {
-      background: none;
-      border: none;
-      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid transparent;
+      color: var(--text-main);
       cursor: pointer;
-      font-size: 13px;
-      padding: 4px 6px;
+      font-size: 14px;
+      padding: 5px 7px;
       border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .card-action-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(1.1);
     }
 
     .card-action-btn:hover {
@@ -713,6 +733,12 @@
 
     /* --- Realtime Cards Synchronization --- */
     const desk = document.getElementById('desk-canvas');
+    // Deselect cards on background click
+    desk.addEventListener('pointerdown', (e) => {
+      if (!e.target.closest('.board-card')) {
+        document.querySelectorAll('.board-card.selected').forEach(c => c.classList.remove('selected'));
+      }
+    });
 
     roomCardsRef.on('child_added', (snapshot) => {
       const cardData = snapshot.val();
@@ -758,6 +784,21 @@
           <button class="card-action-btn delete-btn" title="Убрать со стола" onclick="deleteCard('${card.id}')">✕</button>
         </div>
       `;
+
+      // Double-click to flip card
+      cardEl.addEventListener('dblclick', (e) => {
+        if (e.target.closest('.card-actions-bar')) return;
+        toggleCardFlip(card.id);
+      });
+
+      // Click to select/show menu (especially for touch screens)
+      cardEl.addEventListener('click', (e) => {
+        if (e.target.closest('.card-actions-bar')) return;
+        document.querySelectorAll('.board-card.selected').forEach(c => {
+          if (c !== cardEl) c.classList.remove('selected');
+        });
+        cardEl.classList.toggle('selected');
+      });
 
       desk.appendChild(cardEl);
       setupDrag(cardEl, card.id);
