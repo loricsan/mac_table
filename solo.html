@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>МАК Практика — Пространство самопознания</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Firebase Compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+  <style>
+    :root {
+      --bg-color: #11141a;
+      --board-bg: #181c25;
+      --panel-bg: rgba(22, 26, 35, 0.88);
+      --panel-border: rgba(255, 255, 255, 0.09);
+      --accent: #4a86e8;
+      --accent-hover: #3b6fc2;
+      --accent-soft: rgba(74, 134, 232, 0.15);
+      --text-main: #f0f3f8;
+      --text-muted: #95a0b2;
+      --danger: #e65050;
+      --card-shadow: 0 14px 32px rgba(0, 0, 0, 0.5);
+      --card-radius: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-color);
+      color: var(--text-main);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header.app-header {
+      height: 60px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 100;
+      position: relative;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .app-title {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .controls-center {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .controls-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    select.deck-select {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--panel-border);
+      color: var(--text-main);
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+    }
+
+    select.deck-select option {
+      background: #181c25;
+      color: #fff;
+    }
+
+    button.btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--panel-border);
+      color: var(--text-main);
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    button.btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    button.btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    button.btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    button.btn-accent-outline {
+      border-color: rgba(74, 134, 232, 0.35);
+      color: #8bb6ff;
+      background: rgba(74, 134, 232, 0.08);
+    }
+    button.btn-accent-outline:hover {
+      background: rgba(74, 134, 232, 0.18);
+    }
+
+    button.btn-danger-outline {
+      border-color: rgba(230, 80, 80, 0.3);
+      color: #ff8585;
+    }
+    button.btn-danger-outline:hover {
+      background: rgba(230, 80, 80, 0.15);
+    }
+
+    /* Virtual Desk Board */
+    #desk-canvas {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background-color: var(--board-bg);
+      background-image: 
+        radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    /* Card Item on Board */
+    .board-card {
+      position: absolute;
+      width: 160px;
+      height: 240px;
+      perspective: 1000px;
+      cursor: grab;
+      touch-action: none;
+      transition: transform 0.08s ease-out, box-shadow 0.2s ease;
+      will-change: transform, left, top;
+    }
+
+    .board-card.dragging {
+      cursor: grabbing;
+      opacity: 0.96;
+      transform: scale(1.03) !important;
+      z-index: 99999 !important;
+    }
+
+    .card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      transition: transform 0.45s cubic-bezier(0.4, 0.2, 0.2, 1);
+      border-radius: var(--card-radius);
+      box-shadow: var(--card-shadow);
+    }
+
+    .board-card.flipped .card-inner {
+      transform: rotateY(180deg);
+    }
+
+    .card-front, .card-back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: var(--card-radius);
+      overflow: hidden;
+      background: #252b38;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .card-front img, .card-back img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+      display: block;
+    }
+
+    .card-front {
+      transform: rotateY(180deg);
+    }
+
+    .card-back {
+      transform: rotateY(0deg);
+    }
+
+    /* Fixed Actions Menu Inside Bottom of Card */
+    .card-actions-bar {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 18, 25, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 8px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 25;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.7);
+    }
+
+    /* Hover Bridge */
+    .card-actions-bar::before {
+      content: '';
+      position: absolute;
+      top: -15px;
+      bottom: -15px;
+      left: -15px;
+      right: -15px;
+      z-index: -1;
+    }
+
+    .board-card:hover .card-actions-bar,
+    .board-card.selected .card-actions-bar {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .card-action-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid transparent;
+      color: var(--text-main);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 5px 7px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .card-action-btn:hover {
+      background: rgba(255, 255, 255, 0.22);
+      transform: scale(1.1);
+    }
+
+    .card-action-btn.delete-btn:hover {
+      background: rgba(230, 80, 80, 0.3);
+      color: #ff8585;
+    }
+
+    /* Modals */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(10px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-window {
+      background: #181c26;
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      width: 90%;
+      max-width: 680px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 24px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .modal-close:hover {
+      color: #fff;
+    }
+
+    .modal-body {
+      padding: 22px 24px;
+      overflow-y: auto;
+      flex: 1;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #d1d8e6;
+    }
+
+    /* Instructions / Questions Stylings */
+    .guide-section {
+      margin-bottom: 22px;
+    }
+
+    .guide-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .guide-steps {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .guide-steps li {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--panel-border);
+      font-size: 13px;
+    }
+
+    .guide-steps li strong {
+      color: var(--accent);
+    }
+
+    .question-category {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+    }
+
+    .category-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #9dbaf0;
+      margin-bottom: 8px;
+    }
+
+    .question-list {
+      list-style-type: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .question-list li {
+      font-size: 13px;
+      position: relative;
+      padding-left: 16px;
+    }
+
+    .question-list li::before {
+      content: '•';
+      position: absolute;
+      left: 4px;
+      color: var(--accent);
+    }
+
+    /* Gallery Grid for Open Draw */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+      gap: 14px;
+      padding: 4px;
+    }
+
+    .gallery-item {
+      aspect-ratio: 2/3;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid transparent;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .gallery-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .gallery-item:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+    }
+
+    /* Admin forms */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .form-group input, .form-group textarea {
+      width: 100%;
+      padding: 9px 12px;
+      background: #11141a;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .deck-item-admin {
+      background: #11141a;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .toast-msg {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1f2533;
+      color: #fff;
+      border: 1px solid var(--accent);
+      padding: 10px 22px;
+      border-radius: 30px;
+      font-size: 13px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      z-index: 2000;
+      display: none;
+    }
+
+    @media (max-width: 800px) {
+      header.app-header {
+        height: auto;
+        padding: 8px 12px;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .controls-center, .controls-right {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .board-card {
+        width: 125px;
+        height: 185px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="app-title">
+        <span>✨ МАК Практика</span>
+      </div>
+    </div>
+
+    <div class="controls-center">
+      <select id="deck-selector" class="deck-select">
+        <option value="">Загрузка колод...</option>
+      </select>
+      <button class="btn btn-primary" id="btn-draw-blind" title="Вытянуть карту вслепую рубашкой вверх">
+        🎲 Вслепую
+      </button>
+      <button class="btn" id="btn-draw-open" title="Выбрать карту из открытой галереи">
+        👁 В открытую
+      </button>
+    </div>
+
+    <div class="controls-right">
+      <button class="btn btn-accent-outline" id="btn-open-guide" title="Инструкция и примеры вопросов">
+        💡 Вопросы и подсказки
+      </button>
+      <button class="btn btn-danger-outline" id="btn-clear-desk" title="Очистить ваш стол">
+        🧹 Очистить
+      </button>
+      <button class="btn" id="btn-open-admin" title="Управление колодами (для ведущего)" style="padding: 7px 10px;">
+        ⚙️
+      </button>
+    </div>
+  </header>
+
+  <!-- Virtual Workspace (Table) -->
+  <main id="desk-canvas"></main>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast-msg"></div>
+
+  <!-- Modal: Instructions & Questions -->
+  <div class="modal-backdrop" id="modal-guide">
+    <div class="modal-window">
+      <div class="modal-header">
+        <div class="modal-title">Как работать с картами: инструкция и вопросы</div>
+        <button class="modal-close" onclick="closeModal('modal-guide')">&times;</button>
+      </div>
+      <div class="modal-body">
+        
+        <div class="guide-section">
+          <div class="guide-title">🌱 Простой алгоритм взаимодействия с картой</div>
+          <ul class="guide-steps">
+            <li><strong>Шаг 1:</strong> Сформулируйте свой запрос или ситуацию, которая сейчас волнует.</li>
+            <li><strong>Шаг 2:</strong> Выберите колоду и достаньте карту — <em>вслепую</em> (полагаясь на бессознательное) или <em>в открытую</em> (выбрав откликнувшийся образ).</li>
+            <li><strong>Шаг 3:</strong> Первые 15 секунд просто рассматривайте изображение, не пытаясь рассуждать логически. Заметьте: что первое бросилось в глаза? Какие эмоции и телесные отклики возникают?</li>
+            <li><strong>Шаг 4:</strong> Свяжите карту со своим запросом. Что эта метафора говорит о вас и о вашей ситуации? Какой здесь ресурс?</li>
+          </ul>
+        </div>
+
+        <div class="guide-section">
+          <div class="guide-title">✨ Примеры вопросов для самопознания</div>
+
+          <div class="question-category">
+            <div class="category-name">1. Карта дня / Текущее состояние</div>
+            <ul class="question-list">
+              <li>Что мне сейчас важно осознать и принять?</li>
+              <li>Какое внутреннее состояние станет для меня главной опорой сегодня?</li>
+              <li>Что просит моего внимания и заботы прямо сейчас?</li>
+            </ul>
+          </div>
+
+          <div class="question-category">
+            <div class="category-name">2. Прояснение ситуации / Выбор пути</div>
+            <ul class="question-list">
+              <li>В чем истинная причина того, что происходит?</li>
+              <li>Какая моя слепая зона мешает увидеть решение?</li>
+              <li>Что будет, если я выберу довериться процессу?</li>
+            </ul>
+          </div>
+
+          <div class="question-category">
+            <div class="category-name">3. Поиск ресурса и силы</div>
+            <ul class="question-list">
+              <li>Какая сила или качество во мне готовы раскрыться?</li>
+              <li>Что поможет мне преодолеть внутреннее сопротивление?</li>
+              <li>Какой первый шаг я могу сделать уже сегодня?</li>
+            </ul>
+          </div>
+
+          <div class="question-category">
+            <div class="category-name">4. Исследование отношений и взаимодействий</div>
+            <ul class="question-list">
+              <li>Что на самом деле происходит между мной и другим человеком?</li>
+              <li>Что я привношу в эти отношения, а что жду взамен?</li>
+              <li>Какой урок или дар несет эта встреча?</li>
+            </ul>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Draw Open (Gallery) -->
+  <div class="modal-backdrop" id="modal-gallery">
+    <div class="modal-window">
+      <div class="modal-header">
+        <div class="modal-title" id="gallery-deck-title">Выбор карты в открытую</div>
+        <button class="modal-close" onclick="closeModal('modal-gallery')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">
+          Нажмите на понравившуюся карту, чтобы выложить её на рабочий стол:
+        </p>
+        <div class="gallery-grid" id="gallery-cards-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Admin / Decks Management -->
+  <div class="modal-backdrop" id="modal-admin">
+    <div class="modal-window">
+      <div class="modal-header">
+        <div class="modal-title">Панель управления колодами</div>
+        <button class="modal-close" onclick="closeModal('modal-admin')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Auth Section -->
+        <div id="admin-auth-section">
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+            Вход для ведущего/психолога:
+          </p>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="auth-email" placeholder="ваш@email.com">
+          </div>
+          <div class="form-group">
+            <label>Пароль</label>
+            <input type="password" id="auth-password" placeholder="••••••••">
+          </div>
+          <button class="btn btn-primary" id="btn-admin-login" style="width: 100%;">Войти</button>
+        </div>
+
+        <!-- Decks Manager -->
+        <div id="admin-dashboard-section" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <span style="font-weight: 600; font-size: 14px;">Доступные колоды</span>
+            <button class="btn btn-danger-outline" id="btn-admin-logout" style="padding: 4px 10px; font-size: 12px;">Выйти</button>
+          </div>
+
+          <div id="admin-decks-list" style="margin-bottom: 20px;"></div>
+
+          <hr style="border: 0; border-top: 1px solid var(--panel-border); margin: 20px 0;">
+
+          <div style="font-weight: 600; font-size: 14px; margin-bottom: 12px;">Добавить новую колоду</div>
+          <div class="form-group">
+            <label>Название колоды</label>
+            <input type="text" id="new-deck-title" placeholder="Например: Cope (Совладание)">
+          </div>
+          <div class="form-group">
+            <label>Рубашка карты (файл с компьютера или ссылка)</label>
+            <input type="file" id="new-deck-back-file" accept="image/*" style="margin-bottom: 6px;">
+            <input type="text" id="new-deck-back-url" placeholder="Или прямая ссылка на рубашку (URL)">
+          </div>
+          <div class="form-group">
+            <label>Карты (выберите несколько файлов с компьютера)</label>
+            <input type="file" id="new-deck-cards-files" accept="image/*" multiple style="margin-bottom: 6px;">
+            <div id="upload-status" style="font-size: 12px; color: var(--accent); margin-bottom: 6px; display: none;"></div>
+          </div>
+          <div class="form-group">
+            <label>Или вставьте ссылки на карты (по одной на строку)</label>
+            <textarea id="new-deck-cards-text" placeholder="https://example.com/card1.jpg&#10;https://example.com/card2.jpg"></textarea>
+          </div>
+          <button class="btn btn-primary" id="btn-save-deck" style="width: 100%;">Сохранить колоду</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Card Zoom / Inspect -->
+  <div class="modal-backdrop" id="modal-inspect" onclick="closeModal('modal-inspect')">
+    <div style="max-width: 480px; max-height: 85vh; border-radius: 12px; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.85);">
+      <img id="inspect-image" src="" alt="Карта" style="width: 100%; height: 100%; object-fit: contain; display: block;">
+    </div>
+  </div>
+
+  <script>
+    /* --- Firebase Config (Linked to Same Realtime DB) --- */
+    const firebaseConfig = {
+      apiKey: "AIzaSyCIC3crDQYgg3wO17qKJZWS0RCBWPoY9fs",
+      authDomain: "maccards-315fc.firebaseapp.com",
+      databaseURL: "https://maccards-315fc-default-rtdb.firebaseio.com",
+      projectId: "maccards-315fc",
+      storageBucket: "maccards-315fc.firebasestorage.app",
+      messagingSenderId: "585908630185",
+      appId: "1:585908630185:web:ac23530dc69e6ffe90efb8",
+      measurementId: "G-GXTK752BZB"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const auth = firebase.auth();
+
+    /* --- Default Sample Starter Decks --- */
+    const DEFAULT_DECKS = [
+      {
+        id: "deck_resources",
+        title: "Внутренние Ресурсы",
+        backUrl: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&w=400&q=80",
+        cards: [
+          "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80"
+        ]
+      },
+      {
+        id: "deck_archetypes",
+        title: "Образы и Состояния",
+        backUrl: "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=400&q=80",
+        cards: [
+          "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=600&q=80"
+        ]
+      },
+      {
+        id: "deck_road",
+        title: "Путь и Трансформация",
+        backUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80",
+        cards: [
+          "https://images.unsplash.com/photo-1476820865390-c52aeebb9891?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=80",
+          "https://images.unsplash.com/photo-1510784722466-f2aa9c52fed6?auto=format&fit=crop&w=600&q=80"
+        ]
+      }
+    ];
+
+    /* --- Solo Mode: Client-Side Isolated Desk Storage --- */
+    // Each visitor gets their own local session so they don't disturb anyone else
+    let localCards = [];
+    let highestZ = 10;
+    let availableDecks = [];
+    const desk = document.getElementById('desk-canvas');
+    const decksRef = db.ref('decks');
+
+    // Deselect cards on background click
+    desk.addEventListener('pointerdown', (e) => {
+      if (!e.target.closest('.board-card')) {
+        document.querySelectorAll('.board-card.selected').forEach(c => c.classList.remove('selected'));
+      }
+    });
+
+    /* --- Seed Decks if needed & Listen to DB --- */
+    decksRef.on('value', (snap) => {
+      const data = snap.val();
+      if (!data) {
+        const initialMap = {};
+        DEFAULT_DECKS.forEach(d => initialMap[d.id] = d);
+        decksRef.set(initialMap);
+        availableDecks = DEFAULT_DECKS;
+      } else {
+        availableDecks = Object.values(data);
+      }
+      renderDeckSelector();
+      renderAdminDecksList();
+    });
+
+    function renderDeckSelector() {
+      const select = document.getElementById('deck-selector');
+      select.innerHTML = '';
+      if (availableDecks.length === 0) {
+        select.innerHTML = '<option value="">Нет доступных колод</option>';
+        return;
+      }
+      availableDecks.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.title + ` (${(d.cards || []).length})`;
+        select.appendChild(opt);
+      });
+    }
+
+    function showToast(text) {
+      const toast = document.getElementById('toast');
+      toast.textContent = text;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 2500);
+    }
+
+    function openModal(id) {
+      document.getElementById(id).classList.add('active');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+
+    /* --- Desk Rendering & Dragging --- */
+    function renderCard(card) {
+      const cardEl = document.createElement('div');
+      cardEl.className = 'board-card' + (card.isFlipped ? ' flipped' : '');
+      cardEl.id = 'card_' + card.id;
+      cardEl.style.left = card.x + 'px';
+      cardEl.style.top = card.y + 'px';
+      cardEl.style.transform = `rotate(${card.rotation || 0}deg)`;
+      cardEl.style.zIndex = card.zIndex || 1;
+
+      cardEl.innerHTML = `
+        <div class="card-inner">
+          <div class="card-back">
+            <img src="${card.backUrl}" alt="Рубашка" draggable="false">
+          </div>
+          <div class="card-front">
+            <img src="${card.imageUrl}" alt="Лицо" draggable="false">
+          </div>
+        </div>
+        <div class="card-actions-bar">
+          <button class="card-action-btn" title="Перевернуть" onclick="toggleFlip('${card.id}')">🔄</button>
+          <button class="card-action-btn" title="Повернуть" onclick="rotateCard('${card.id}')">⤾</button>
+          <button class="card-action-btn" title="Рассмотреть" onclick="inspectCard('${card.imageUrl}')">🔍</button>
+          <button class="card-action-btn delete-btn" title="Убрать карту" onclick="removeCard('${card.id}')">✕</button>
+        </div>
+      `;
+
+      // Double-click to flip
+      cardEl.addEventListener('dblclick', (e) => {
+        if (e.target.closest('.card-actions-bar')) return;
+        toggleFlip(card.id);
+      });
+
+      // Click to select/show menu
+      cardEl.addEventListener('click', (e) => {
+        if (e.target.closest('.card-actions-bar')) return;
+        document.querySelectorAll('.board-card.selected').forEach(c => {
+          if (c !== cardEl) c.classList.remove('selected');
+        });
+        cardEl.classList.toggle('selected');
+      });
+
+      desk.appendChild(cardEl);
+      setupDrag(cardEl, card);
+    }
+
+    function setupDrag(el, card) {
+      let isDragging = false;
+      let startX, startY;
+      let initialLeft, initialTop;
+
+      el.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('.card-actions-bar')) return;
+        isDragging = true;
+        el.classList.add('dragging');
+        el.setPointerCapture(e.pointerId);
+
+        startX = e.clientX;
+        startY = e.clientY;
+        initialLeft = parseFloat(el.style.left) || 0;
+        initialTop = parseFloat(el.style.top) || 0;
+
+        highestZ += 1;
+        el.style.zIndex = highestZ;
+        card.zIndex = highestZ;
+      });
+
+      el.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        const newX = Math.max(10, initialLeft + dx);
+        const newY = Math.max(10, initialTop + dy);
+
+        el.style.left = newX + 'px';
+        el.style.top = newY + 'px';
+        card.x = newX;
+        card.y = newY;
+      });
+
+      function stopDrag(e) {
+        if (!isDragging) return;
+        isDragging = false;
+        el.classList.remove('dragging');
+        try { el.releasePointerCapture(e.pointerId); } catch(err){}
+      }
+
+      el.addEventListener('pointerup', stopDrag);
+      el.addEventListener('pointercancel', stopDrag);
+    }
+
+    window.toggleFlip = function(cardId) {
+      const card = localCards.find(c => c.id === cardId);
+      if (!card) return;
+      card.isFlipped = !card.isFlipped;
+      const el = document.getElementById('card_' + cardId);
+      if (el) {
+        if (card.isFlipped) el.classList.add('flipped');
+        else el.classList.remove('flipped');
+      }
+    };
+
+    window.rotateCard = function(cardId) {
+      const card = localCards.find(c => c.id === cardId);
+      if (!card) return;
+      card.rotation = ((card.rotation || 0) + 45) % 360;
+      const el = document.getElementById('card_' + cardId);
+      if (el) el.style.transform = `rotate(${card.rotation}deg)`;
+    };
+
+    window.removeCard = function(cardId) {
+      localCards = localCards.filter(c => c.id !== cardId);
+      const el = document.getElementById('card_' + cardId);
+      if (el) el.remove();
+    };
+
+    window.inspectCard = function(url) {
+      document.getElementById('inspect-image').src = url;
+      openModal('modal-inspect');
+    };
+
+    /* --- Drawing Cards --- */
+    function getSelectedDeck() {
+      const id = document.getElementById('deck-selector').value;
+      return availableDecks.find(d => d.id === id);
+    }
+
+    document.getElementById('btn-draw-blind').addEventListener('click', () => {
+      const deck = getSelectedDeck();
+      if (!deck || !deck.cards || deck.cards.length === 0) {
+        showToast('В выбранной колоде нет карт');
+        return;
+      }
+      const randomImage = deck.cards[Math.floor(Math.random() * deck.cards.length)];
+      const cardId = 'c_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+
+      const deskRect = desk.getBoundingClientRect();
+      const centerX = Math.max(20, (deskRect.width / 2) - 80 + (Math.random() * 60 - 30));
+      const centerY = Math.max(20, (deskRect.height / 2) - 120 + (Math.random() * 60 - 30));
+
+      highestZ += 1;
+      const newCard = {
+        id: cardId,
+        imageUrl: randomImage,
+        backUrl: deck.backUrl || 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=400',
+        x: Math.round(centerX),
+        y: Math.round(centerY),
+        isFlipped: false,
+        rotation: 0,
+        zIndex: highestZ
+      };
+
+      localCards.push(newCard);
+      renderCard(newCard);
+      showToast('Карта выложена в закрытую');
+    });
+
+    document.getElementById('btn-draw-open').addEventListener('click', () => {
+      const deck = getSelectedDeck();
+      if (!deck || !deck.cards || deck.cards.length === 0) {
+        showToast('В выбранной колоде нет карт');
+        return;
+      }
+
+      document.getElementById('gallery-deck-title').textContent = 'Колода: ' + deck.title;
+      const grid = document.getElementById('gallery-cards-container');
+      grid.innerHTML = '';
+
+      deck.cards.forEach((url, idx) => {
+        const item = document.createElement('div');
+        item.className = 'gallery-item';
+        item.innerHTML = `<img src="${url}" alt="Карта ${idx+1}" loading="lazy">`;
+        item.onclick = () => {
+          placeOpenCard(deck, url);
+          closeModal('modal-gallery');
+        };
+        grid.appendChild(item);
+      });
+
+      openModal('modal-gallery');
+    });
+
+    function placeOpenCard(deck, imageUrl) {
+      const cardId = 'c_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+      const deskRect = desk.getBoundingClientRect();
+      const centerX = Math.max(20, (deskRect.width / 2) - 80 + (Math.random() * 60 - 30));
+      const centerY = Math.max(20, (deskRect.height / 2) - 120 + (Math.random() * 60 - 30));
+
+      highestZ += 1;
+      const newCard = {
+        id: cardId,
+        imageUrl: imageUrl,
+        backUrl: deck.backUrl || 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=400',
+        x: Math.round(centerX),
+        y: Math.round(centerY),
+        isFlipped: true,
+        rotation: 0,
+        zIndex: highestZ
+      };
+
+      localCards.push(newCard);
+      renderCard(newCard);
+      showToast('Карта выложена на стол');
+    }
+
+    document.getElementById('btn-clear-desk').addEventListener('click', () => {
+      if (confirm('Очистить рабочий стол?')) {
+        localCards = [];
+        desk.innerHTML = '';
+        showToast('Стол очищен');
+      }
+    });
+
+    document.getElementById('btn-open-guide').addEventListener('click', () => {
+      openModal('modal-guide');
+    });
+
+    /* --- Admin Panel Logic --- */
+    document.getElementById('btn-open-admin').addEventListener('click', () => {
+      openModal('modal-admin');
+    });
+
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        document.getElementById('admin-auth-section').style.display = 'none';
+        document.getElementById('admin-dashboard-section').style.display = 'block';
+      } else {
+        document.getElementById('admin-auth-section').style.display = 'block';
+        document.getElementById('admin-dashboard-section').style.display = 'none';
+      }
+    });
+
+    document.getElementById('btn-admin-login').addEventListener('click', () => {
+      const email = document.getElementById('auth-email').value.trim();
+      const pass = document.getElementById('auth-password').value;
+      if (!email || !pass) {
+        alert('Введите email и пароль');
+        return;
+      }
+      auth.signInWithEmailAndPassword(email, pass).catch((err) => {
+        alert('Ошибка входа: ' + err.message);
+      });
+    });
+
+    document.getElementById('btn-admin-logout').addEventListener('click', () => {
+      auth.signOut();
+    });
+
+    function renderAdminDecksList() {
+      const list = document.getElementById('admin-decks-list');
+      list.innerHTML = '';
+      if (availableDecks.length === 0) {
+        list.innerHTML = '<p style="color:var(--text-muted); font-size:13px;">Нет добавленных колод</p>';
+        return;
+      }
+
+      availableDecks.forEach(d => {
+        const item = document.createElement('div');
+        item.className = 'deck-item-admin';
+        item.innerHTML = `
+          <div>
+            <strong style="font-size:14px;">${d.title}</strong>
+            <div style="font-size:12px; color:var(--text-muted);">${(d.cards || []).length} карт</div>
+          </div>
+          <button class="btn btn-danger-outline" style="padding:4px 8px; font-size:12px;" onclick="removeDeck('${d.id}')">Удалить</button>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    window.removeDeck = function(deckId) {
+      if (confirm('Вы уверены, что хотите удалить эту колоду?')) {
+        decksRef.child(deckId).remove();
+        showToast('Колода удалена');
+      }
+    };
+
+    function compressImageFile(file, maxWidth = 380, quality = 0.75) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const scale = Math.min(1, maxWidth / img.width);
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    document.getElementById('btn-save-deck').addEventListener('click', async () => {
+      const title = document.getElementById('new-deck-title').value.trim();
+      const backUrlInput = document.getElementById('new-deck-back-url').value.trim();
+      const backFileInput = document.getElementById('new-deck-back-file');
+      const cardsFilesInput = document.getElementById('new-deck-cards-files');
+      const cardsTextInput = document.getElementById('new-deck-cards-text').value.trim();
+      const statusEl = document.getElementById('upload-status');
+      const saveBtn = document.getElementById('btn-save-deck');
+
+      if (!title) {
+        alert('Укажите название колоды');
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Обработка и сохранение...';
+      statusEl.style.display = 'block';
+      statusEl.textContent = 'Обработка...';
+
+      try {
+        let finalBackUrl = backUrlInput;
+        if (backFileInput.files && backFileInput.files[0]) {
+          statusEl.textContent = 'Сжатие рубашки карты...';
+          finalBackUrl = await compressImageFile(backFileInput.files[0], 380, 0.8);
+        }
+
+        if (!finalBackUrl) {
+          finalBackUrl = 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&w=400&q=80';
+        }
+
+        let finalCards = [];
+        if (cardsTextInput) {
+          const textUrls = cardsTextInput.split('\n').map(s => s.trim()).filter(s => s.startsWith('http') || s.startsWith('data:'));
+          finalCards.push(...textUrls);
+        }
+
+        if (cardsFilesInput.files && cardsFilesInput.files.length > 0) {
+          const total = cardsFilesInput.files.length;
+          for (let i = 0; i < total; i++) {
+            statusEl.textContent = `Сжатие карты ${i + 1} из ${total}...`;
+            const dataUrl = await compressImageFile(cardsFilesInput.files[i], 380, 0.75);
+            finalCards.push(dataUrl);
+          }
+        }
+
+        if (finalCards.length === 0) {
+          alert('Добавьте хотя бы одну карту');
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Сохранить колоду';
+          statusEl.style.display = 'none';
+          return;
+        }
+
+        statusEl.textContent = 'Сохранение колоды в базу...';
+        const newId = 'deck_' + Date.now();
+        await decksRef.child(newId).set({
+          id: newId,
+          title: title,
+          backUrl: finalBackUrl,
+          cards: finalCards
+        });
+
+        showToast('Колода успешно добавлена!');
+        document.getElementById('new-deck-title').value = '';
+        document.getElementById('new-deck-back-url').value = '';
+        document.getElementById('new-deck-back-file').value = '';
+        document.getElementById('new-deck-cards-files').value = '';
+        document.getElementById('new-deck-cards-text').value = '';
+        statusEl.style.display = 'none';
+      } catch (err) {
+        alert('Ошибка при сохранении колоды: ' + err.message);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Сохранить колоду';
+      }
+    });
+
+  </script>
+</body>
+</html>
